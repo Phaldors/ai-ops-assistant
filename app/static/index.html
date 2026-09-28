@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI Ops Assistant</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #171a21;
+    --border: #262b36;
+    --text: #e6e8eb;
+    --muted: #8b93a1;
+    --accent: #6366f1;
+    --accent-soft: #6366f122;
+    --agent-bubble: #1f2430;
+    --user-bubble: #6366f1;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+  .app {
+    width: 100%;
+    max-width: 640px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.35);
+    display: flex;
+    flex-direction: column;
+    height: 640px;
+  }
+  header {
+    padding: 18px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .dot {
+    width: 10px; height: 10px; border-radius: 50%;
+    background: #22c55e;
+    box-shadow: 0 0 8px #22c55e;
+  }
+  header h1 {
+    font-size: 15px;
+    font-weight: 600;
+    margin: 0;
+  }
+  header span {
+    font-size: 12px;
+    color: var(--muted);
+    margin-left: auto;
+  }
+  #mesajlar {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .satir { display: flex; }
+  .satir.kullanici { justify-content: flex-end; }
+  .satir.agent { justify-content: flex-start; }
+  .balon {
+    max-width: 78%;
+    padding: 10px 14px;
+    border-radius: 14px;
+    font-size: 14px;
+    line-height: 1.45;
+    white-space: pre-wrap;
+  }
+  .kullanici .balon {
+    background: var(--user-bubble);
+    color: white;
+    border-bottom-right-radius: 4px;
+  }
+  .agent .balon {
+    background: var(--agent-bubble);
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-bottom-left-radius: 4px;
+  }
+  .yukleniyor .balon {
+    color: var(--muted);
+    font-style: italic;
+  }
+  form {
+    display: flex;
+    gap: 8px;
+    padding: 14px;
+    border-top: 1px solid var(--border);
+  }
+  input {
+    flex: 1;
+    background: #0f1115;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    color: var(--text);
+    font-size: 14px;
+    outline: none;
+  }
+  input:focus { border-color: var(--accent); }
+  button {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 0 18px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { opacity: 0.9; }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  #mesajlar::-webkit-scrollbar { width: 8px; }
+  #mesajlar::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="dot"></div>
+      <h1>AI Ops Assistant</h1>
+      <span>RAG · Web · Bakım tahmini</span>
+    </header>
+    <div id="mesajlar"></div>
+    <form id="form">
+      <input id="giris" type="text" placeholder="Bir şey sor..." autocomplete="off">
+      <button type="submit" id="gonderBtn">Gönder</button>
+    </form>
+  </div>
+
+  <script>
+    const form = document.getElementById("form");
+    const giris = document.getElementById("giris");
+    const mesajlar = document.getElementById("mesajlar");
+    const gonderBtn = document.getElementById("gonderBtn");
+    const threadId = "web-" + Math.random().toString(36).slice(2, 8);
+
+    function balonEkle(metin, tip) {
+      const satir = document.createElement("div");
+      satir.className = `satir ${tip}`;
+      satir.innerHTML = `<div class="balon">${metin}</div>`;
+      mesajlar.appendChild(satir);
+      mesajlar.scrollTop = mesajlar.scrollHeight;
+      return satir;
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const metin = giris.value.trim();
+      if (!metin) return;
+
+      balonEkle(metin, "kullanici");
+      giris.value = "";
+      gonderBtn.disabled = true;
+      const yukleniyorSatiri = balonEkle("...", "agent yukleniyor");
+
+      try {
+        const yanit = await fetch("/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ metin, thread_id: threadId })
+        });
+        const veri = await yanit.json();
+        yukleniyorSatiri.remove();
+        balonEkle(veri.cevap, "agent");
+      } catch (err) {
+        yukleniyorSatiri.remove();
+        balonEkle("Bir hata oluştu, tekrar dene.", "agent");
+      } finally {
+        gonderBtn.disabled = false;
+        giris.focus();
+      }
+    });
+  </script>
+</body>
+</html>
